@@ -13,11 +13,14 @@ class RateLimiter {
         this.next = 0;
     }
 
-    async wait() {
-        const now = Date.now();
-        const slot = Math.max(now, this.next);
+    /** Waits for the next request slot; gives up as soon as the run starts stopping (never sleeps past the deadline). */
+    async wait(msLeft) {
+        const slot = Math.max(Date.now(), this.next);
         this.next = slot + this.interval;
-        if (slot > now) await sleep(slot - now);
+        while (Date.now() < slot) {
+            if (msLeft() <= 0) throw new StoppedError('run stopping');
+            await sleep(Math.min(500, slot - Date.now()));
+        }
     }
 }
 
@@ -26,8 +29,10 @@ export class Session {
         this.rotate();
     }
 
+    /** New proxy IP. Anything YouTube bound to the old IP (the visitor ID) is dropped with it. */
     rotate() {
         this.id = `s${Math.random().toString(36).slice(2, 12)}`;
+        this.visitorData = null;
     }
 }
 
@@ -82,17 +87,20 @@ export class Client {
             if (this.msLeft() <= 0) throw new StoppedError('run stopping');
             const idx = this.routeIdx;
             const route = this.routes[idx];
-            await route.limiter.wait();
+            // per-attempt values that depend on the session (e.g. the visitor ID of the current proxy IP)
+            const extra = o.prepare ? await o.prepare(session) : {};
+            const json = o.json && extra.json ? extra.json : o.json;
+            await route.limiter.wait(this.msLeft);
             if (this.msLeft() <= 0) throw new StoppedError('run stopping');
             this.stats.requests += 1;
             let res;
             try {
                 res = await gotScraping({
                     url: o.url,
-                    method: o.method ?? (o.json ? 'POST' : 'GET'),
-                    ...(o.json ? { json: o.json } : {}),
+                    method: o.method ?? (json ? 'POST' : 'GET'),
+                    ...(json ? { json } : {}),
                     ...(o.body !== undefined ? { body: o.body } : {}),
-                    headers: o.headers ?? {},
+                    headers: { ...(o.headers ?? {}), ...(extra.headers ?? {}) },
                     useHeaderGenerator: Boolean(o.browserHeaders),
                     proxyUrl: route.proxy ? await route.proxy.newUrl(session.id) : undefined,
                     responseType: o.responseType ?? 'text',

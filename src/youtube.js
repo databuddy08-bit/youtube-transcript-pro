@@ -1,14 +1,19 @@
 // YouTube: input parsing, InnerTube player/metadata/listing calls, caption download and parsing.
-import { BlockedError } from './http.js';
+import { BlockedError, StoppedError } from './http.js';
 
 const YT = process.env.YT_BASE ?? 'https://www.youtube.com';
 const ID_RE = /^[A-Za-z0-9_-]{11}$/;
 
-// Verified working logged-out from a datacenter IP (Oct 2026): ANDROID_VR player returns caption tracks with directly downloadable URLs.
-const VR_CLIENT = { clientName: 'ANDROID_VR', clientVersion: '1.60.19', deviceMake: 'Oculus', deviceModel: 'Quest 3', androidSdkVersion: 32, osName: 'Android', osVersion: '12L', hl: 'en', gl: 'US' };
-const VR_UA = 'com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip';
-const WEB_CLIENT = { clientName: 'WEB', clientVersion: '2.20250101.00.00', hl: 'en', gl: 'US' };
-const WEB_HEADERS = { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36', origin: 'https://www.youtube.com' };
+// App clients, tried in this order. Verified Oct 2026: with a visitor ID from the same IP, IOS and ANDROID get past the
+// "confirm you're not a bot" check that blocks ANDROID_VR and WEB playback from datacenter and residential IPs.
+const APP_CLIENTS = [
+    { name: 'ios', client: { clientName: 'IOS', clientVersion: '20.10.4', deviceMake: 'Apple', deviceModel: 'iPhone16,2', osName: 'iPhone', osVersion: '18.3.2.22D82' }, ua: 'com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)' },
+    { name: 'android', client: { clientName: 'ANDROID', clientVersion: '20.10.38', androidSdkVersion: 30, osName: 'Android', osVersion: '11' }, ua: 'com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip' },
+    { name: 'android_vr', client: { clientName: 'ANDROID_VR', clientVersion: '1.65.10', deviceMake: 'Oculus', deviceModel: 'Quest 3', androidSdkVersion: 32, osName: 'Android', osVersion: '12L' }, ua: 'com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip' },
+];
+const WEB_CLIENT = { clientName: 'WEB', clientVersion: '2.20261022.01.00', hl: 'en', gl: 'US' };
+const WEB_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+const WEB_HEADERS = { 'user-agent': WEB_UA, origin: 'https://www.youtube.com' };
 
 // ---------- Input parsing ----------
 
@@ -49,14 +54,32 @@ export const watchUrl = (id) => `https://www.youtube.com/watch?v=${id}`;
 // ---------- InnerTube ----------
 
 export function makeYouTube(client) {
-    const innertube = (endpoint, payload, session, { vr = false, soft = false } = {}) => client.fetch({
+    /** Visitor ID for the session's current IP (≈2 KB). Rotating the session (new IP) clears it. */
+    async function visitor(session) {
+        if (session.visitorData) return session.visitorData;
+        try {
+            const r = await client.fetch({ url: `${YT}/sw.js_data`, headers: { 'user-agent': WEB_UA }, attempts: 2, soft: true }, session);
+            session.visitorData = String(r.body).match(/"(Cg[\w%-]{18,})"/)?.[1] ?? null;
+        } catch (err) {
+            if (err instanceof StoppedError) throw err;
+            session.visitorData = null;
+        }
+        return session.visitorData;
+    }
+
+    const innertube = (endpoint, payload, session, { app = null, soft = false, attempts } = {}) => client.fetch({
         url: `${YT}/youtubei/v1/${endpoint}?prettyPrint=false`,
-        json: { ...payload, context: { client: vr ? VR_CLIENT : WEB_CLIENT } },
-        headers: vr ? { 'user-agent': VR_UA, 'content-type': 'application/json' } : { ...WEB_HEADERS, 'content-type': 'application/json' },
+        json: { ...payload, context: { client: app ? { hl: 'en', gl: 'US', ...app.client } : WEB_CLIENT } },
+        headers: { 'user-agent': app ? app.ua : WEB_UA, ...(app ? {} : { origin: WEB_HEADERS.origin }), 'content-type': 'application/json' },
+        prepare: async (s) => {
+            const vd = await visitor(s);
+            if (!vd) return {};
+            const ctxClient = app ? { hl: 'en', gl: 'US', ...app.client, visitorData: vd } : { ...WEB_CLIENT, visitorData: vd };
+            return { json: { ...payload, context: { client: ctxClient } }, headers: { 'x-goog-visitor-id': vd } };
+        },
         allow403: false,
         soft,
-        // The player is what YouTube bot-checks: on a proxy, give it more fresh IPs before giving up.
-        attempts: endpoint === 'player' && client.route.proxy ? 6 : undefined,
+        attempts,
         isBlocked: (res) => {
             if (typeof res.body !== 'string' || !res.body.startsWith('{')) return null;
             const reason = res.body.match(/"playabilityStatus":\{"status":"LOGIN_REQUIRED","reason":"([^"]+)"/)?.[1];
@@ -73,21 +96,14 @@ export function makeYouTube(client) {
         return json;
     });
 
-    /** Player data from the ANDROID_VR client: details, caption tracks, audio streams. */
-    async function player(videoId, session) {
-        const j = await innertube('player', { videoId, contentCheckOk: true, racyCheckOk: true }, session, { vr: true });
+    const shape = (j, videoId, app) => {
         const ps = j.playabilityStatus ?? {};
         const d = j.videoDetails ?? {};
-        const tracks = (j.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? []).map((t) => ({
-            languageCode: t.languageCode,
-            name: t.name?.simpleText ?? t.name?.runs?.map((x) => x.text).join('') ?? t.languageCode,
-            isAuto: t.kind === 'asr',
-            isTranslatable: t.isTranslatable !== false,
-            baseUrl: t.baseUrl?.startsWith('http') ? t.baseUrl : `${YT}${t.baseUrl}`,
-        }));
         return {
             status: ps.status ?? 'UNKNOWN',
             reason: ps.reason ?? ps.messages?.[0] ?? null,
+            client: app.name,
+            hasDetails: Boolean(d.videoId),
             details: {
                 video_id: d.videoId ?? videoId,
                 title: d.title ?? null,
@@ -100,10 +116,41 @@ export function makeYouTube(client) {
                 is_live_content: Boolean(d.isLiveContent),
                 thumbnail: d.thumbnail?.thumbnails?.at(-1)?.url ?? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
             },
-            tracks,
+            tracks: (j.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? []).map((t) => ({
+                languageCode: t.languageCode,
+                name: t.name?.simpleText ?? t.name?.runs?.map((x) => x.text).join('') ?? t.languageCode,
+                isAuto: t.kind === 'asr',
+                isTranslatable: t.isTranslatable !== false,
+                baseUrl: t.baseUrl?.startsWith('http') ? t.baseUrl : `${YT}${t.baseUrl}`,
+                ua: app.ua,
+            })),
             audio: (j.streamingData?.adaptiveFormats ?? []).filter((f) => f.mimeType?.startsWith('audio/') && f.url)
-                .map((f) => ({ itag: f.itag, mime: f.mimeType, bitrate: f.bitrate, bytes: f.contentLength ? Number(f.contentLength) : null, url: f.url })),
+                .map((f) => ({ itag: f.itag, mime: f.mimeType, bitrate: f.bitrate, bytes: f.contentLength ? Number(f.contentLength) : null, url: f.url, ua: app.ua })),
         };
+    };
+
+    /**
+     * Player data (details, caption tracks, audio). Tries the app clients in order: the next one is used when a client is
+     * bot-checked or refuses the video. Returns the first playable answer, else the most informative refusal.
+     */
+    async function player(videoId, session) {
+        let best = null;
+        let lastErr = null;
+        for (const app of APP_CLIENTS) {
+            let j;
+            try {
+                j = await innertube('player', { videoId, contentCheckOk: true, racyCheckOk: true }, session, { app, attempts: client.route.proxy ? 3 : 2 });
+            } catch (err) {
+                if (!(err instanceof BlockedError)) throw err;
+                lastErr = err;
+                continue;
+            }
+            const r = shape(j, videoId, app);
+            if (r.status === 'OK' || r.tracks.length) return r;
+            if (!best || (!best.hasDetails && r.hasDetails)) best = r;
+        }
+        if (best) return best;
+        throw lastErr ?? new BlockedError('every player client was refused');
     }
 
     /** Extra metadata from the WEB player's microformat (works even when WEB playback is refused). Never throws. */
@@ -204,8 +251,8 @@ export function makeYouTube(client) {
 
     /** Downloads one caption track. `tlang` asks YouTube for its own machine translation of the track. */
     async function captions(track, session, { tlang } = {}) {
-        const url = `${track.baseUrl}${track.baseUrl.includes('fmt=') ? '' : '&fmt=srv3'}${tlang ? `&tlang=${encodeURIComponent(tlang)}` : ''}`;
-        const r = await client.fetch({ url, headers: { 'user-agent': VR_UA }, ...(tlang ? { attempts: 1, soft: true } : {}) }, session);
+        const url = `${track.baseUrl.replace(/&fmt=[^&]*/g, '')}&fmt=srv3${tlang ? `&tlang=${encodeURIComponent(tlang)}` : ''}`;
+        const r = await client.fetch({ url, headers: { 'user-agent': track.ua ?? WEB_UA }, ...(tlang ? { attempts: 1, soft: true } : {}) }, session);
         const segs = parseCaptions(String(r.body));
         if (!segs.length && String(r.body).length > 50) throw new Error('caption file could not be parsed');
         return segs;
@@ -218,8 +265,14 @@ export function makeYouTube(client) {
         const parts = [];
         for (let start = 0; start < total; start += 1_000_000) {
             const end = Math.min(total - 1, start + 999_999);
-            const r = await client.fetch({ url: `${fmt.url}&range=${start}-${end}`, headers: { 'user-agent': VR_UA }, responseType: 'buffer', timeoutMs: 60000 }, session);
-            if (r.status >= 400) throw new Error(`audio download HTTP ${r.status}`);
+            let r;
+            try {
+                r = await client.fetch({ url: `${fmt.url}&range=${start}-${end}`, headers: { 'user-agent': fmt.ua ?? WEB_UA }, responseType: 'buffer', timeoutMs: 60000, attempts: 2, soft: true, allow403: true }, session);
+            } catch (err) {
+                if (err instanceof BlockedError) throw new Error(`YouTube refused the audio download (${err.message})`);
+                throw err;
+            }
+            if (r.status >= 400) throw new Error(`YouTube refused the audio download (HTTP ${r.status})`);
             parts.push(r.body);
             if (r.body.length < end - start + 1) break;
         }

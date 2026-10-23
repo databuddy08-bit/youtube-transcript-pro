@@ -20,6 +20,8 @@ const VIDEOS = {
     shortVid001: { title: 'A short', duration: 30, tracks: [['en', true]], shorts: true, publish: '2025-05-05' },
     oldVideo001: { title: 'An old video', duration: 100, tracks: [['en', true]], publish: '2015-01-01' },
     botFlaky001: { title: 'Flaky one', duration: 60, tracks: [['en', true]], botFirst: 2, publish: '2025-04-04' },
+    iosBlocked1: { title: 'IOS refused', duration: 60, tracks: [['en', true]], blockClients: ['IOS'], publish: '2025-04-04' },
+    labelBlock1: { title: 'Label restricted', duration: 200, tracks: [], unplayable: true, publish: '2025-04-04' },
 };
 const video = (id) => VIDEOS[id] ?? { title: `Generic ${id}`, duration: 120, tracks: [['en', true]], publish: '2025-07-07' };
 
@@ -35,13 +37,17 @@ export async function startMock({ delayMs = 0 } = {}) {
     const readBody = (req) => new Promise((r) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => r(Buffer.concat(c))); });
     const runs = (t) => ({ runs: [{ text: t }] });
 
-    function player(id, client) {
+    const BOT = { playabilityStatus: { status: 'LOGIN_REQUIRED', reason: 'Sign in to confirm you’re not a bot' } };
+    function player(id, client, visitorData) {
         const v = video(id);
-        if (v.botFirst && client === 'ANDROID_VR') {
+        if (client !== 'WEB' && !visitorData) { hit('noVisitor'); return BOT; } // like real YouTube: app clients without a visitor ID are bot-checked
+        if (v.blockClients?.includes(client)) return BOT;
+        if (v.botFirst && client !== 'WEB') {
             flaky[id] = (flaky[id] ?? 0) + 1;
             if (flaky[id] <= v.botFirst) return { playabilityStatus: { status: 'LOGIN_REQUIRED', reason: 'Sign in to confirm you’re not a bot' } };
         }
         if (v.status) return { playabilityStatus: { status: v.status, reason: v.reason } };
+        if (v.unplayable && client !== 'WEB') return { playabilityStatus: { status: 'UNPLAYABLE', reason: 'This video is not available' }, videoDetails: { videoId: id, title: v.title, author: 'Mock Channel', channelId: CHANNEL_ID, lengthSeconds: String(v.duration), viewCount: '5' } };
         if (client === 'WEB') {
             return { playabilityStatus: { status: 'LOGIN_REQUIRED', reason: 'Sign in' }, // like the real WEB client: playback refused, microformat present
                 microformat: { playerMicroformatRenderer: { category: 'Education', publishDate: `${v.publish}T08:00:00-07:00`, likeCount: '1234', isFamilySafe: true, isShortsEligible: Boolean(v.shorts), ownerProfileUrl: 'http://www.youtube.com/@mockchannel' } } };
@@ -95,7 +101,8 @@ export async function startMock({ delayMs = 0 } = {}) {
             const b = j();
             const c = b.context?.client?.clientName;
             hit(`player:${c}`);
-            return send(res, 200, player(b.videoId, c));
+            if (b.context?.client?.visitorData && req.headers['x-goog-visitor-id'] !== b.context.client.visitorData) return send(res, 400, { error: { code: 400, message: 'visitor mismatch' } });
+            return send(res, 200, player(b.videoId, c, b.context?.client?.visitorData));
         }
         if (path === '/youtubei/v1/navigation/resolve_url') {
             hit('resolve');
@@ -114,6 +121,10 @@ export async function startMock({ delayMs = 0 } = {}) {
             if (b.continuation) return send(res, 200, browse(b));
             if (b.query === 'nothing at all') return send(res, 200, { contents: {} });
             return send(res, 200, listPage(['srchVid0001', 'srchVid0002', 'srchVid0003'], 'videoRenderer', 'search-p2'));
+        }
+        if (path === '/sw.js_data') {
+            hit('visitor');
+            return send(res, 200, `)]}'\n[["yt.sw.adr",null,[[["en","US",null,null,null,null,"CgtNb2NrVmlzaXRvcijX%3D%3D"]]]]]`, 'application/json');
         }
         if (path === '/api/timedtext') {
             hit('timedtext');

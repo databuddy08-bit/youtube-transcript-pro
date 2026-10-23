@@ -120,6 +120,6 @@ Each run saves a `RUN_SUMMARY` record in the key-value store. It contains:
 
 **Which languages are supported?** Every caption language YouTube has (100+). Translation also covers 100+ target languages.
 
-**What happens if a video has no captions?** You get a free `no_captions` row. To get a transcript anyway, turn on AI transcription and add your Groq or OpenAI key. Audio over 25 MB, or longer than your AI minutes limit, is skipped and not charged.
+**What happens if a video has no captions?** You get a free `no_captions` row. To get a transcript anyway, turn on AI transcription and add your Groq or OpenAI key. Audio over 25 MB, or longer than your AI minutes limit, is skipped and not charged. YouTube sometimes refuses audio downloads; when it does, the video comes back as a free `no_captions` row that gives the reason.
 
 **Is my API key safe?** The key field is a secret input. Apify stores it encrypted, and it is only sent to the provider you choose.

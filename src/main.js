@@ -130,7 +130,7 @@ const FIX = {
         ? 'This video has no captions in any language. Turn on "AI transcription" with your OpenAI or Groq key to transcribe it from the audio.'
         : 'No captions, and AI transcription could not run for this video (see error).',
     no_matching_language: 'Captions exist, but not in your chosen languages. Add one of the available languages, or turn on "Fall back to any language".',
-    unavailable: 'The video is private, deleted, or blocked in the region YouTube served this request from.',
+    unavailable: 'The video is private, deleted, blocked in the region YouTube served this request from, or restricted by its music label for apps (e.g. some official music videos).',
     age_restricted: 'YouTube requires sign-in for this video (age-restricted or members-only). Logged-out scraping cannot read it.',
     upcoming: 'The video is a scheduled premiere or live stream that hasn\'t happened yet.',
     blocked: `YouTube kept blocking requests on every route this run tried (${routes.map((r) => r.label).join(', ')}). Run again in a few minutes.`,
@@ -237,7 +237,7 @@ async function processVideo(item) {
     try {
         const [player, meta] = await Promise.all([yt.player(id, session), opts.extraMetadata || publishedAfter || opts.skipShorts ? yt.webMeta(id, session) : null]);
         pl = player;
-        Object.assign(base, pl.details, meta ?? {});
+        Object.assign(base, pl.details, meta ?? {}, { player_client: pl.client });
         base.title = base.title ?? item.title ?? null;
         base.channel_url = base.channel_url ?? (base.channel_id ? `https://www.youtube.com/channel/${base.channel_id}` : null);
     } catch (err) {

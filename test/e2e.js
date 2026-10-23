@@ -48,12 +48,12 @@ const mock = await startMock();
 if (want('videos')) {
     console.log('\n=== 1. SINGLE VIDEOS (formats, translation fallback, failures, bot-check retry) ===');
     const r = await run('videos', {
-        urls: ['https://www.youtube.com/watch?v=okVideo0001&t=10s', 'https://youtu.be/okVideo0001', 'https://www.youtube.com/shorts/deOnly00001', 'noCaption01', 'https://m.youtube.com/watch?v=ageLimited1', 'https://www.youtube.com/embed/goneVideo01', 'https://vimeo.com/123', 'botFlaky001'],
+        urls: ['https://www.youtube.com/watch?v=okVideo0001&t=10s', 'https://youtu.be/okVideo0001', 'https://www.youtube.com/shorts/deOnly00001', 'noCaption01', 'https://m.youtube.com/watch?v=ageLimited1', 'https://www.youtube.com/embed/goneVideo01', 'https://vimeo.com/123', 'botFlaky001', 'iosBlocked1', 'labelBlock1'],
         translateTo: 'hi', chunkWords: 20, chunkOverlapWords: 5, transcriptKeywords: ['machine learning', 'recaptcha'], includeTimestampedText: true, includeParagraphs: true,
     }, { mock });
     const ok = r.ok.find((x) => x.video_id === 'okVideo0001');
-    check('3 transcripts saved (ok, German fallback, bot-checked-then-ok), duplicate URL removed', r.code === 0 && r.ok.length === 3 && r.summary.skipReasons.duplicate_video === 1, `${r.secs}s ${r.ok.map((x) => x.video_id)}`);
-    check('only transcripts are charged, failed rows free', billed(r) && r.chargeCount === 3);
+    check('4 transcripts saved (ok, German fallback, bot-checked-then-ok, IOS-blocked), duplicate URL removed', r.code === 0 && r.ok.length === 4 && r.summary.skipReasons.duplicate_video === 1, `${r.secs}s ${r.ok.map((x) => x.video_id)}`);
+    check('only transcripts are charged, failed rows free', billed(r) && r.chargeCount === 4);
     check('human captions preferred over auto (en manual)', ok?.is_auto_generated === false && ok.language === 'en' && ok.matched_preferred_language === true);
     check('metadata complete (title, channel, views, likes, category, publish date, tags)', ok && ok.title && ok.channel === 'Mock Channel' && ok.view_count === 98765 && ok.like_count === 1234 && ok.category === 'Education' && ok.publish_date.startsWith('2025-06-01') && ok.tags.length === 2 && ok.available_languages.join() === 'en,de');
     check('HTML entities decoded (&amp; and &#39;)', ok?.transcript.includes('recaptcha & that') && ok.transcript.includes("Let's move"));
@@ -63,12 +63,15 @@ if (want('videos')) {
     check('LLM chunks with overlap and deep links', ok?.chunks.length >= 3 && ok.chunks.every((c) => c.word_count >= 1 && c.url.includes('&t=')) && ok.chunks[1].start < ok.chunks[0].end + 7, `${ok?.chunks.length} chunks`);
     check('keyword hits incl. a transcript that says "recaptcha" (not mistaken for a block)', ok?.keyword_match_count === 3 && ok.keyword_matches.some((k) => k.keyword === 'recaptcha'), JSON.stringify(ok?.keyword_matches.map((k) => `${k.keyword}@${k.time_hms}`)));
     check('YouTube translation 429 -> Google Translate fallback, timings kept', ok?.translation_source.startsWith('google translate') && ok.transcript_translated.startsWith('[hi] Welcome') && ok.data_translated.length === ok.data.length && ok.data_translated[3].start === ok.data[3].start);
-    check('YouTube translation 429s did not hurt the route', r.summary.routes[0].blocked <= 2 && r.summary.translation.google_translate === 3, JSON.stringify(r.summary.routes));
+    check('YouTube translation 429s did not hurt the route', r.summary.routes[0].blocked === 4 && mock.hits.tlang >= 4 && r.summary.translation.google_translate === 4, JSON.stringify(r.summary.routes));
     const de = r.ok.find((x) => x.video_id === 'deOnly00001');
     check('no English -> falls back to German, flagged as not preferred', de?.language === 'de' && de.matched_preferred_language === false && de.transcript.startsWith('Hallo'));
     check('statuses: no_captions / age_restricted / unavailable / invalid_input with fix hints', statusOf(r, 'noCaption01') === 'no_captions' && statusOf(r, 'ageLimited1') === 'age_restricted' && statusOf(r, 'goneVideo01') === 'unavailable' && r.failed.some((x) => x.status === 'invalid_input') && r.failed.every((x) => x.fix_hint));
     check('bot-checked video retried and saved', statusOf(r, 'botFlaky001') === 'ok');
-    check('RUN_SUMMARY: languages, caption kinds, statuses', r.summary.captionKinds.manual === 2 && r.summary.captionKinds.auto === 1 && r.summary.statusCounts.ok === 3 && r.summary.stopReason === 'completed');
+    check('visitor ID fetched and sent with every app-client request', mock.hits.visitor >= 1 && !mock.hits.noVisitor, `visitor fetches ${mock.hits.visitor}`);
+    check('IOS bot-checked -> ANDROID client used', r.ok.find((x) => x.video_id === 'iosBlocked1')?.player_client === 'android');
+    check('label-restricted video -> unavailable row that still has its title', r.failed.find((x) => x.video_id === 'labelBlock1')?.status === 'unavailable' && r.failed.find((x) => x.video_id === 'labelBlock1').title === 'Label restricted');
+    check('RUN_SUMMARY: languages, caption kinds, statuses', r.summary.captionKinds.manual === 2 && r.summary.captionKinds.auto === 2 && r.summary.statusCounts.ok === 4 && r.summary.stopReason === 'completed');
 }
 
 if (want('lists')) {
@@ -145,7 +148,7 @@ if (want('limits')) {
     const mr = await run('maxresults', { urls: ['https://www.youtube.com/@mockchannel'], maxVideosPerSource: 20, maxResults: 7 }, { mock });
     check('maxResults 7 -> exactly 7', mr.ok.length === 7 && mr.chargeCount === 7 && mr.summary.stopReason === 'max_results_reached');
     const slow = await startMock({ delayMs: 400 });
-    const to = await run('timeout', { urls: ['https://www.youtube.com/@mockchannel'], maxVideosPerSource: 25 }, { mock: slow, env: { ACTOR_TIMEOUT_AT: new Date(Date.now() + 52000).toISOString(), HTTP_RATE_SCALE: '1' } });
+    const to = await run('timeout', { urls: ['https://www.youtube.com/@mockchannel'], maxVideosPerSource: 25 }, { mock: slow, env: { ACTOR_TIMEOUT_AT: new Date(Date.now() + 62000).toISOString(), HTTP_RATE_SCALE: '1' } });
     check('stops 45 s before timeout, saves what it has and writes RUN_SUMMARY', to.code === 0 && to.ok.length > 0 && to.ok.length < 25 && /timeout_approaching/.test(to.summary?.stopReason ?? '') && billed(to), `${to.ok.length} saved in ${to.secs}s`);
     slow.close();
 }
