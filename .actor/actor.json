@@ -1,0 +1,15 @@
+{
+    "actorSpecification": 1,
+    "name": "youtube-transcript-pro",
+    "title": "YouTube Transcript Pro \u2014 Subtitles, Captions, Translation & LLM Chunks",
+    "description": "Transcripts for YouTube videos, Shorts, channels, playlists and search: text, SRT, VTT, timestamps, chapters, keyword hits, LLM/RAG chunks, translation into 100+ languages and optional AI transcription for videos without captions.",
+    "version": "1.0",
+    "buildTag": "latest",
+    "input": "./input_schema.json",
+    "output": "./output_schema.json",
+    "storages": {
+        "dataset": "./dataset_schema.json"
+    },
+    "dockerfile": "../Dockerfile",
+    "readme": "../README.md"
+}

@@ -1,0 +1,334 @@
+{
+    "actorSpecification": 1,
+    "fields": {},
+    "views": {
+        "overview": {
+            "title": "Overview",
+            "transformation": {
+                "fields": [
+                    "status",
+                    "url",
+                    "video_id",
+                    "title",
+                    "channel",
+                    "language",
+                    "is_auto_generated",
+                    "transcript_source",
+                    "word_count",
+                    "line_count",
+                    "transcript",
+                    "transcript_translated",
+                    "translated_to",
+                    "translation_source",
+                    "duration_seconds",
+                    "view_count",
+                    "like_count",
+                    "publish_date",
+                    "category",
+                    "is_short",
+                    "available_languages",
+                    "chapters",
+                    "keyword_match_count",
+                    "keyword_matches",
+                    "chunks",
+                    "srt",
+                    "vtt",
+                    "thumbnail",
+                    "channel_id",
+                    "channel_url",
+                    "description",
+                    "tags",
+                    "ai_model",
+                    "source",
+                    "input_value",
+                    "error",
+                    "fix_hint",
+                    "scraped_at"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "status": {
+                        "label": "Status",
+                        "format": "text"
+                    },
+                    "url": {
+                        "label": "Video URL",
+                        "format": "link"
+                    },
+                    "video_id": {
+                        "label": "Video ID",
+                        "format": "text"
+                    },
+                    "title": {
+                        "label": "Title",
+                        "format": "text"
+                    },
+                    "channel": {
+                        "label": "Channel",
+                        "format": "text"
+                    },
+                    "language": {
+                        "label": "Language",
+                        "format": "text"
+                    },
+                    "is_auto_generated": {
+                        "label": "Auto-generated",
+                        "format": "boolean"
+                    },
+                    "transcript_source": {
+                        "label": "Transcript source",
+                        "format": "text"
+                    },
+                    "word_count": {
+                        "label": "Words",
+                        "format": "number"
+                    },
+                    "line_count": {
+                        "label": "Lines",
+                        "format": "number"
+                    },
+                    "transcript": {
+                        "label": "Transcript",
+                        "format": "text"
+                    },
+                    "transcript_translated": {
+                        "label": "Translated transcript",
+                        "format": "text"
+                    },
+                    "translated_to": {
+                        "label": "Translated to",
+                        "format": "text"
+                    },
+                    "translation_source": {
+                        "label": "Translation source",
+                        "format": "text"
+                    },
+                    "duration_seconds": {
+                        "label": "Duration (s)",
+                        "format": "number"
+                    },
+                    "view_count": {
+                        "label": "Views",
+                        "format": "number"
+                    },
+                    "like_count": {
+                        "label": "Likes",
+                        "format": "number"
+                    },
+                    "publish_date": {
+                        "label": "Published",
+                        "format": "date"
+                    },
+                    "category": {
+                        "label": "Category",
+                        "format": "text"
+                    },
+                    "is_short": {
+                        "label": "Short",
+                        "format": "boolean"
+                    },
+                    "available_languages": {
+                        "label": "Available languages",
+                        "format": "array"
+                    },
+                    "chapters": {
+                        "label": "Chapters",
+                        "format": "array"
+                    },
+                    "keyword_match_count": {
+                        "label": "Keyword hits",
+                        "format": "number"
+                    },
+                    "keyword_matches": {
+                        "label": "Keyword matches",
+                        "format": "array"
+                    },
+                    "chunks": {
+                        "label": "Chunks",
+                        "format": "array"
+                    },
+                    "srt": {
+                        "label": "SRT",
+                        "format": "text"
+                    },
+                    "vtt": {
+                        "label": "VTT",
+                        "format": "text"
+                    },
+                    "thumbnail": {
+                        "label": "Thumbnail",
+                        "format": "image"
+                    },
+                    "channel_id": {
+                        "label": "Channel ID",
+                        "format": "text"
+                    },
+                    "channel_url": {
+                        "label": "Channel URL",
+                        "format": "link"
+                    },
+                    "description": {
+                        "label": "Description",
+                        "format": "text"
+                    },
+                    "tags": {
+                        "label": "Tags",
+                        "format": "array"
+                    },
+                    "ai_model": {
+                        "label": "AI model",
+                        "format": "text"
+                    },
+                    "source": {
+                        "label": "Source",
+                        "format": "text"
+                    },
+                    "input_value": {
+                        "label": "Input",
+                        "format": "text"
+                    },
+                    "error": {
+                        "label": "Error",
+                        "format": "text"
+                    },
+                    "fix_hint": {
+                        "label": "How to fix",
+                        "format": "text"
+                    },
+                    "scraped_at": {
+                        "label": "Scraped at",
+                        "format": "date"
+                    }
+                }
+            }
+        },
+        "transcripts": {
+            "title": "Transcripts only",
+            "transformation": {
+                "fields": [
+                    "url",
+                    "title",
+                    "channel",
+                    "language",
+                    "is_auto_generated",
+                    "word_count",
+                    "transcript",
+                    "transcript_translated"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "url": {
+                        "label": "Video URL",
+                        "format": "link"
+                    },
+                    "title": {
+                        "label": "Title",
+                        "format": "text"
+                    },
+                    "channel": {
+                        "label": "Channel",
+                        "format": "text"
+                    },
+                    "language": {
+                        "label": "Language",
+                        "format": "text"
+                    },
+                    "is_auto_generated": {
+                        "label": "Auto-generated",
+                        "format": "boolean"
+                    },
+                    "word_count": {
+                        "label": "Words",
+                        "format": "number"
+                    },
+                    "transcript": {
+                        "label": "Transcript",
+                        "format": "text"
+                    },
+                    "transcript_translated": {
+                        "label": "Translated transcript",
+                        "format": "text"
+                    }
+                }
+            }
+        },
+        "keywords": {
+            "title": "Keyword hits",
+            "transformation": {
+                "fields": [
+                    "url",
+                    "title",
+                    "keyword_match_count",
+                    "keyword_matches"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "url": {
+                        "label": "Video URL",
+                        "format": "link"
+                    },
+                    "title": {
+                        "label": "Title",
+                        "format": "text"
+                    },
+                    "keyword_match_count": {
+                        "label": "Keyword hits",
+                        "format": "number"
+                    },
+                    "keyword_matches": {
+                        "label": "Keyword matches",
+                        "format": "array"
+                    }
+                }
+            }
+        },
+        "failed": {
+            "title": "Videos without transcript",
+            "transformation": {
+                "fields": [
+                    "status",
+                    "url",
+                    "title",
+                    "error",
+                    "fix_hint",
+                    "input_value"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "status": {
+                        "label": "Status",
+                        "format": "text"
+                    },
+                    "url": {
+                        "label": "Video URL",
+                        "format": "link"
+                    },
+                    "title": {
+                        "label": "Title",
+                        "format": "text"
+                    },
+                    "error": {
+                        "label": "Error",
+                        "format": "text"
+                    },
+                    "fix_hint": {
+                        "label": "How to fix",
+                        "format": "text"
+                    },
+                    "input_value": {
+                        "label": "Input",
+                        "format": "text"
+                    }
+                }
+            }
+        }
+    }
+}

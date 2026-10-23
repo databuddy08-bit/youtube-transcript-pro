@@ -1,0 +1,263 @@
+{
+    "title": "YouTube Transcript Pro input",
+    "description": "Get transcripts, subtitles and captions from YouTube videos, channels, playlists and search.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "urls": {
+            "title": "YouTube URLs",
+            "type": "array",
+            "editor": "stringList",
+            "sectionCaption": "Videos",
+            "description": "Videos (watch, youtu.be, Shorts, embed, live, m./music.youtube.com), channels (@handle, /channel/UC…, /c/…, /user/…), playlists, or plain 11-character video IDs. Channels and playlists are expanded into their videos.",
+            "prefill": [
+                "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                "https://www.youtube.com/@3blue1brown"
+            ]
+        },
+        "searchQueries": {
+            "title": "Search queries",
+            "type": "array",
+            "editor": "stringList",
+            "default": [],
+            "description": "Find videos by YouTube search, e.g. \"claude ai tutorial\". Each query is treated like a channel: up to \"Max videos per channel / playlist / search\" videos."
+        },
+        "maxVideosPerSource": {
+            "title": "Max videos per channel / playlist / search",
+            "type": "integer",
+            "minimum": 1,
+            "default": 20,
+            "description": "How many videos to take from each channel, playlist or search query (newest first for channels)."
+        },
+        "channelTab": {
+            "title": "Channel tab",
+            "type": "string",
+            "editor": "select",
+            "enum": [
+                "videos",
+                "shorts",
+                "streams"
+            ],
+            "enumTitles": [
+                "Videos",
+                "Shorts",
+                "Live streams"
+            ],
+            "default": "videos",
+            "description": "Which channel tab to read. A tab in the URL (e.g. /@name/shorts) overrides this."
+        },
+        "languages": {
+            "title": "Preferred languages",
+            "type": "array",
+            "editor": "stringList",
+            "sectionCaption": "Language & translation",
+            "default": [
+                "en"
+            ],
+            "description": "Caption languages in order of preference, as codes: en, hi, es, fr, de, ja, pt-BR… \"en\" also matches en-US / en-GB."
+        },
+        "fallbackToAnyLanguage": {
+            "title": "Fall back to any language",
+            "type": "boolean",
+            "default": true,
+            "description": "If none of your languages exist, take the video's own caption track instead of skipping it."
+        },
+        "preferManualCaptions": {
+            "title": "Prefer human-made captions",
+            "type": "boolean",
+            "default": true,
+            "description": "Use creator-uploaded captions over YouTube's auto-generated ones when both exist in the chosen language."
+        },
+        "allLanguages": {
+            "title": "Download every available language",
+            "type": "boolean",
+            "default": false,
+            "description": "One result per caption track (each language, manual and auto). Each is charged as a transcript."
+        },
+        "translateTo": {
+            "title": "Translate to",
+            "type": "string",
+            "editor": "textfield",
+            "default": "",
+            "description": "Optional language code (e.g. hi, en, es). Adds transcript_translated using YouTube's own caption translation, or Google Translate line by line when YouTube refuses. Leave empty for no translation."
+        },
+        "includeSrt": {
+            "title": "SRT subtitles",
+            "type": "boolean",
+            "default": true,
+            "sectionCaption": "Output formats",
+            "description": "Add a ready-to-use .srt subtitle file as text."
+        },
+        "includeVtt": {
+            "title": "WebVTT subtitles",
+            "type": "boolean",
+            "default": true,
+            "description": "Add a ready-to-use .vtt subtitle file as text."
+        },
+        "includeSegments": {
+            "title": "Timestamped segments",
+            "type": "boolean",
+            "default": true,
+            "description": "Add \"data\" (text, start, dur for every line) and \"lines\"."
+        },
+        "includeTimestampedText": {
+            "title": "Text with timestamps",
+            "type": "boolean",
+            "default": false,
+            "description": "Add transcript_timestamped: one line per caption with [m:ss] in front — easy to read and to cite."
+        },
+        "includeParagraphs": {
+            "title": "Paragraphs",
+            "type": "boolean",
+            "default": false,
+            "description": "Add the transcript as readable paragraphs (split on pauses), each with its start time."
+        },
+        "chunkWords": {
+            "title": "LLM / RAG chunk size (words)",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Split the transcript into chunks of about this many words, each with start/end time and a link to that moment in the video. 0 = off. 200–500 suits most RAG setups."
+        },
+        "chunkOverlapWords": {
+            "title": "Chunk overlap (words)",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Words repeated between neighbouring chunks, for better retrieval. 0 = no overlap."
+        },
+        "includeChapters": {
+            "title": "Chapters",
+            "type": "boolean",
+            "default": true,
+            "description": "When the description lists chapters (0:00 Intro …), add each chapter with its own transcript text and link."
+        },
+        "transcriptKeywords": {
+            "title": "Find keywords in transcripts",
+            "type": "array",
+            "editor": "stringList",
+            "default": [],
+            "description": "Every moment these words or phrases are said, with the line, context and a link to that second of the video."
+        },
+        "extraMetadata": {
+            "title": "Extra metadata (category, publish date, likes)",
+            "type": "boolean",
+            "default": true,
+            "description": "One small extra request per video for category, exact publish date and like count."
+        },
+        "publishedAfter": {
+            "title": "Only videos published after",
+            "type": "string",
+            "editor": "textfield",
+            "default": "",
+            "sectionCaption": "Filters (filtered videos are never charged)",
+            "description": "A date (2025-01-31) or a period (\"30 days\", \"6 months\"). Uses the exact publish date."
+        },
+        "minDurationSeconds": {
+            "title": "Min duration (seconds)",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Skip videos shorter than this. 0 = off."
+        },
+        "maxDurationSeconds": {
+            "title": "Max duration (seconds)",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Skip videos longer than this. 0 = off."
+        },
+        "skipShorts": {
+            "title": "Skip Shorts",
+            "type": "boolean",
+            "default": false,
+            "description": "Leave out YouTube Shorts."
+        },
+        "aiProvider": {
+            "title": "AI transcription for videos without captions",
+            "type": "string",
+            "editor": "select",
+            "enum": [
+                "none",
+                "groq",
+                "openai"
+            ],
+            "enumTitles": [
+                "Off",
+                "Groq Whisper (fast, cheapest)",
+                "OpenAI Whisper"
+            ],
+            "default": "none",
+            "sectionCaption": "AI transcription (optional, your own API key)",
+            "description": "When a video has no captions, download its audio and transcribe it with your own API key. You pay the AI provider directly (Groq ≈ $0.04 / audio hour, OpenAI ≈ $0.36 / audio hour)."
+        },
+        "aiApiKey": {
+            "title": "AI provider API key",
+            "type": "string",
+            "editor": "textfield",
+            "isSecret": true,
+            "description": "Your Groq or OpenAI API key. Stored encrypted by Apify and only sent to the provider you chose."
+        },
+        "aiMaxMinutes": {
+            "title": "Max video length for AI (minutes)",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600,
+            "default": 60,
+            "description": "Longer caption-less videos are skipped (and not charged). Audio files above 25 MB are skipped too."
+        },
+        "maxResults": {
+            "title": "Max transcripts in total",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "sectionCaption": "Run limits",
+            "description": "Stop after this many saved (and charged) transcripts. 0 = no limit."
+        },
+        "includeFailedVideos": {
+            "title": "Show videos without a transcript",
+            "type": "boolean",
+            "default": true,
+            "description": "Adds a free row (status = no_captions / unavailable / age_restricted / blocked / invalid_input …) with the reason and how to fix it."
+        },
+        "skipPreviouslyScraped": {
+            "title": "Skip videos saved in previous runs",
+            "type": "boolean",
+            "default": false,
+            "description": "Remembers saved video + language pairs in a named key-value store — ideal for scheduled channel monitoring."
+        },
+        "dedupeStoreName": {
+            "title": "Memory store name",
+            "type": "string",
+            "editor": "textfield",
+            "pattern": "^[a-z0-9-]{1,63}$",
+            "default": "youtube-transcript-pro-seen",
+            "description": "Key-value store used by \"Skip videos saved in previous runs\". Lowercase letters, numbers and hyphens."
+        },
+        "proxyFallback": {
+            "title": "Automatic proxy fallback",
+            "type": "boolean",
+            "default": true,
+            "sectionCaption": "Proxy",
+            "description": "If YouTube keeps bot-checking the chosen proxy, switch automatically to Apify residential, then datacenter proxy, then the server IP."
+        },
+        "proxyConfiguration": {
+            "title": "Proxy configuration",
+            "type": "object",
+            "editor": "proxy",
+            "prefill": {
+                "useApifyProxy": true,
+                "apifyProxyGroups": [
+                    "RESIDENTIAL"
+                ]
+            },
+            "default": {
+                "useApifyProxy": true,
+                "apifyProxyGroups": [
+                    "RESIDENTIAL"
+                ]
+            },
+            "description": "YouTube bot-checks server IPs. Residential works best and costs about $0.0002 per video (≈25 KB per video)."
+        }
+    }
+}
